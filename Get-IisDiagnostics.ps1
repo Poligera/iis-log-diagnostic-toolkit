@@ -68,8 +68,8 @@ foreach ($line in $lines) {
         $serverErrors += @{
             Timestamp = $parts[0] + " " + $parts[1]
             StatusCode = $statusCode
-            Method = $parts[fields.IndexOf("cs-method")]
-            Path = $parts[fields.IndexOf("cs-uri-stem")]
+            Method = $parts[$fields.IndexOf("cs-method")]
+            Path = $parts[$fields.IndexOf("cs-uri-stem")]
         }
     }
 }
