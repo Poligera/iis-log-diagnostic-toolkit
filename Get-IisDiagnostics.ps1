@@ -36,3 +36,15 @@ if (-not (Test-Path $LogPath)) {
 
 $lines = Get-Content $LogPath
 Write-Host "Loaded $($lines.Count) lines from log file."
+
+$fieldLine = $lines | Where-Object { $_ -like "#Fields:*" } | Select-Object -First 1
+if (-not $fieldLine) {
+    throw "Could not find IIS #Fields header in log file."
+}
+
+$fields = ($fieldLine -replace "#Fields:\s*", "") -split "\s+"
+
+$statusIndex = $fields.IndexOf("sc-status")
+if ($statusIndex -lt 0) {
+    throw "Could not find 'sc-status' field in IIS log header."
+}
