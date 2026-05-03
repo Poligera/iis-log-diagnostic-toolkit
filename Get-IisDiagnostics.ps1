@@ -19,7 +19,7 @@ function Invoke-MockLogDownload {
         [string]$InstanceId
     )
 
-    Write-Host "Simuating IIS log retrieval from S3 for instance: $InstanceId..."
+    Write-Host "Simulating IIS log retrieval from S3 for instance: $InstanceId..."
 }
 
 Write-Host "Instance ID: $InstanceId"
@@ -72,4 +72,30 @@ foreach ($line in $lines) {
             Path = $parts[$fields.IndexOf("cs-uri-stem")]
         }
     }
+}
+
+$instanceState = Get-MockInstanceState -InstanceId $InstanceId
+
+Invoke-MockLogDownload -InstanceId $InstanceId
+
+Write-Host ""
+Write-Host "===== IIS Diagnostic Summary ====="
+Write-Host "Instance ID: $InstanceId"
+Write-Host "Instance State: $instanceState"
+Write-Host "Total HTTP 500 Errors: $($serverErrors.Count)"
+Write-Host ""
+ 
+if ($serverErrors.Count -gt 0) {
+    Write-Host "HTTP 500 Error Timestamps:"
+    foreach ($error in $serverErrors) {
+        Write-Host "- $($error.Timestamp) [$($error.Method)] $($error.Path)"
+    }
+}
+else {
+    Write-Host "No HTTP 500 errors found."
+}
+ 
+if ($malformedLines.Count -gt 0) {
+    Write-Host ""
+    Write-Warning "$($malformedLines.Count) malformed log line(s) were skipped."
 }
