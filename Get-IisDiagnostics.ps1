@@ -48,3 +48,28 @@ $statusIndex = $fields.IndexOf("sc-status")
 if ($statusIndex -lt 0) {
     throw "Could not find 'sc-status' field in IIS log header."
 }
+
+$serverErrors = @()
+$malformedLines = @()
+
+foreach ($line in $lines) {
+    if ($line -like "#*" -or [string]::IsNullOrWhiteSpace($line)) {
+        continue
+    }
+
+    $parts = $line -split "\s+"
+    if ($parts.Count -ne $fields.Count) {
+        $malformedLines += $line
+        continue
+    }
+
+    $statusCode = $parts[$statusIndex]
+    if ($statusCode -eq "500") {
+        $serverErrors += @{
+            Timestamp = $parts[0] + " " + $parts[1]
+            StatusCode = $statusCode
+            Method = $parts[fields.IndexOf("cs-method")]
+            Path = $parts[fields.IndexOf("cs-uri-stem")]
+        }
+    }
+}
