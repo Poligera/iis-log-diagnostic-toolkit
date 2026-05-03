@@ -45,8 +45,9 @@ Current limitations:
 ## Example Output
 
 ```text
+Retrieving zipped IIS log archive from S3 for instance i-0d79fe9169fb369f9... 
+Extracting log file for analysis...
 Loaded 14 lines from log file.
-Retrieving IIS log from S3 for instance i-0d79fe9169fb369f9...
 
 ===== IIS Diagnostic Summary =====
 Instance ID: i-0d79fe9169fb369f9

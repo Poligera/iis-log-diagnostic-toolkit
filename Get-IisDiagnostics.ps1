@@ -13,7 +13,7 @@ function Get-MockInstanceState {
 
 function Invoke-MockLogDownload {
     param([string]$InstanceId)
-    return "Retrieving IIS log from S3 for instance $InstanceId..."
+    return "Retrieving zipped IIS log archive from S3 for instance $InstanceId... `nExtracting log file for analysis..."
 }
 
 try {
@@ -33,7 +33,6 @@ try {
 
     # Load IIS log
     $lines = Get-Content $LogPath
-    Write-Information "Loaded $($lines.Count) lines from log file."
 
     $fieldLine = $lines | Where-Object { $_ -like "#Fields:*" } | Select-Object -First 1
     if (-not $fieldLine) {
@@ -86,6 +85,7 @@ try {
     $instanceState = Get-MockInstanceState -InstanceId $InstanceId
 
     Write-Information (Invoke-MockLogDownload -InstanceId $InstanceId)
+    Write-Information "Loaded $($lines.Count) lines from log file."
     Write-Information ""
     Write-Information "===== IIS Diagnostic Summary ====="
     Write-Information "Instance ID: $InstanceId"
