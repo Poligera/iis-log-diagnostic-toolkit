@@ -33,3 +33,6 @@ if
 if (-not (Test-Path $LogPath)) {
     throw "Log file not found at path: $LogPath"
 }
+
+$lines = Get-Content $LogPath
+Write-Host "Loaded $($lines.Count) lines from log file."
