@@ -7,95 +7,108 @@ param(
 )
 
 function Get-MockInstanceState {
-    param(
-        [string]$InstanceId
-    )
-
+    param([string]$InstanceId)
     return "running"
 }
 
 function Invoke-MockLogDownload {
-    param(
-        [string]$InstanceId
-    )
-
-    Write-Host "Simulating IIS log retrieval from S3 for instance: $InstanceId..."
+    param([string]$InstanceId)
+    return "Retrieving IIS log from S3 for instance $InstanceId..."
 }
 
-Write-Host "Instance ID: $InstanceId"
-Write-Host "Log Path: $LogPath"
+try {
+    # Ensure non-terminating errors are catchable by the top-level try/catch
+    $ErrorActionPreference = 'Stop'
 
-if
-([string]::IsNullOrWhiteSpace($InstanceId)) {
-    throw "InstanceId is required."
-}
+    # Use the Information stream so messages show without polluting pipeline output
+    $InformationPreference = 'Continue'
 
-if (-not (Test-Path $LogPath)) {
-    throw "Log file not found at path: $LogPath"
-}
-
-$lines = Get-Content $LogPath
-Write-Host "Loaded $($lines.Count) lines from log file."
-
-$fieldLine = $lines | Where-Object { $_ -like "#Fields:*" } | Select-Object -First 1
-if (-not $fieldLine) {
-    throw "Could not find IIS #Fields header in log file."
-}
-
-$fields = ($fieldLine -replace "#Fields:\s*", "") -split "\s+"
-
-$statusIndex = $fields.IndexOf("sc-status")
-if ($statusIndex -lt 0) {
-    throw "Could not find 'sc-status' field in IIS log header."
-}
-
-$serverErrors = @()
-$malformedLines = @()
-
-foreach ($line in $lines) {
-    if ($line -like "#*" -or [string]::IsNullOrWhiteSpace($line)) {
-        continue
+    if ([string]::IsNullOrWhiteSpace($InstanceId)) {
+        throw "InstanceId is required."
     }
 
-    $parts = $line -split "\s+"
-    if ($parts.Count -ne $fields.Count) {
-        $malformedLines += $line
-        continue
+    if (-not (Test-Path $LogPath)) {
+        throw "Log file not found at path: $LogPath"
     }
 
-    $statusCode = $parts[$statusIndex]
-    if ($statusCode -eq "500") {
-        $serverErrors += @{
-            Timestamp = $parts[0] + " " + $parts[1]
-            StatusCode = $statusCode
-            Method = $parts[$fields.IndexOf("cs-method")]
-            Path = $parts[$fields.IndexOf("cs-uri-stem")]
+    # Load IIS log
+    $lines = Get-Content $LogPath
+    Write-Information "Loaded $($lines.Count) lines from log file."
+
+    $fieldLine = $lines | Where-Object { $_ -like "#Fields:*" } | Select-Object -First 1
+    if (-not $fieldLine) {
+        throw "Could not find IIS #Fields header in log file."
+    }
+
+    # Field positions are determined dynamically to avoid hard-coded assumptions
+    $fields = ($fieldLine -replace "#Fields:\s*", "") -split "\s+"
+
+    $statusIndex = $fields.IndexOf("sc-status")
+    if ($statusIndex -lt 0) {
+        throw "Could not find 'sc-status' field in IIS log header."
+    }
+
+    $methodIndex = $fields.IndexOf("cs-method")
+    if ($methodIndex -lt 0) {
+        throw "Could not find 'cs-method' field in IIS log header."
+    }
+
+    $pathIndex = $fields.IndexOf("cs-uri-stem")
+    if ($pathIndex -lt 0) {
+        throw "Could not find 'cs-uri-stem' field in IIS log header."
+    }
+
+    $serverErrors = @()
+    $malformedLines = @()
+
+    foreach ($line in $lines) {
+        if ($line -like "#*" -or [string]::IsNullOrWhiteSpace($line)) {
+            continue
+        }
+
+        $parts = $line -split "\s+"
+        if ($parts.Count -ne $fields.Count) {
+            $malformedLines += $line
+            continue
+        }
+
+        $statusCode = $parts[$statusIndex]
+        if ($statusCode -eq "500") {
+            $serverErrors += [PSCustomObject]@{
+                Timestamp = "$($parts[0]) $($parts[1])"
+                StatusCode = "500"
+                Method = $parts[$methodIndex]
+                Path = $parts[$pathIndex]
+            }
         }
     }
-}
 
-$instanceState = Get-MockInstanceState -InstanceId $InstanceId
+    $instanceState = Get-MockInstanceState -InstanceId $InstanceId
 
-Invoke-MockLogDownload -InstanceId $InstanceId
-
-Write-Host ""
-Write-Host "===== IIS Diagnostic Summary ====="
-Write-Host "Instance ID: $InstanceId"
-Write-Host "Instance State: $instanceState"
-Write-Host "Total HTTP 500 Errors: $($serverErrors.Count)"
-Write-Host ""
- 
-if ($serverErrors.Count -gt 0) {
-    Write-Host "HTTP 500 Error Timestamps:"
-    foreach ($error in $serverErrors) {
-        Write-Host "- $($error.Timestamp) [$($error.Method)] $($error.Path)"
+    Write-Information (Invoke-MockLogDownload -InstanceId $InstanceId)
+    Write-Information ""
+    Write-Information "===== IIS Diagnostic Summary ====="
+    Write-Information "Instance ID: $InstanceId"
+    Write-Information "Instance State: $instanceState"
+    Write-Information "Total HTTP 500 Errors: $($serverErrors.Count)"
+    Write-Information ""
+    
+    if ($serverErrors.Count) {
+        Write-Information "HTTP 500 Error Timestamps:"
+        foreach ($error in $serverErrors) {
+            Write-Information "- $($error.Timestamp) [$($error.Method)] $($error.Path)"
+        }
+    }
+    else {
+        Write-Information "No HTTP 500 errors found."
+    }
+    
+    if ($malformedLines.Count) {
+        Write-Information ""
+        Write-Warning "$($malformedLines.Count) malformed log line(s) were skipped."
     }
 }
-else {
-    Write-Host "No HTTP 500 errors found."
-}
- 
-if ($malformedLines.Count -gt 0) {
-    Write-Host ""
-    Write-Warning "$($malformedLines.Count) malformed log line(s) were skipped."
+catch {
+    Write-Error "IIS diagnostic failed: $($_.Exception.Message)"
+    throw
 }
