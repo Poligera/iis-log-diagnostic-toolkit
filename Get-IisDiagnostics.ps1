@@ -6,6 +6,22 @@ param(
     [string]$LogPath = ".\mockIISLog.txt"
 )
 
+function Get-MockInstanceState {
+    param(
+        [string]$InstanceId
+    )
+
+    return "running"
+}
+
+function Invoke-MockLogDownload {
+    param(
+        [string]$InstanceId
+    )
+
+    Write-Host "Simuating IIS log retrieval from S3 for instance: $InstanceId..."
+}
+
 Write-Host "Instance ID: $InstanceId"
 Write-Host "Log Path: $LogPath"
 
@@ -17,4 +33,3 @@ if
 if (-not (Test-Path $LogPath)) {
     throw "Log file not found at path: $LogPath"
 }
-
