@@ -50,7 +50,7 @@ Extracting log file for analysis...
 Loaded 14 lines from log file.
 
 ===== IIS Diagnostic Summary =====
-Instance ID: i-0d79fe9169fb369f9
+Instance ID: i-0123456789abcdef0
 Instance State: running
 Total HTTP 500 Errors: 3
 
